@@ -39,7 +39,11 @@ class PluginMollieCallback extends PluginCallback
         } elseif ($payment->isFailed() || $payment->isExpired() || $payment->isCanceled() || $payment->hasChargebacks()) {
 
             $transaction = "$pluginName payment of $payAmount was not accepted. Original Signup Invoice: $invoiceID (OrderID: " . $transactionId . ")";
-            $cPlugin->PaymentRejected($transaction);
+            if ($cPlugin->IsUnpaid()) {
+                $cPlugin->PaymentRejected($transaction);
+            } else {
+                $cPlugin->PaymentRejected($transaction, false);
+            }
         } elseif ($payment->hasRefunds()) {
 
             $transaction = "$pluginName payment of $payAmount was refunded. Original Signup Invoice: $invoiceID (OrderID: " . $payment->id . ")";
