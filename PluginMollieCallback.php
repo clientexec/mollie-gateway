@@ -1,12 +1,12 @@
 <?php
+
 require_once 'modules/admin/models/PluginCallback.php';
 require_once 'modules/billing/models/class.gateway.plugin.php';
 
 class PluginMollieCallback extends PluginCallback
 {
-    function processCallback()
+    public function processCallback()
     {
-
         $mollie = new \Mollie\Api\MollieApiClient();
         $mollie->setApiKey($this->settings->get('plugin_mollie_API Key'));
 
@@ -27,21 +27,20 @@ class PluginMollieCallback extends PluginCallback
         $cPlugin->m_TransactionID = $transactionId;
         $cPlugin->m_Action = "charge";
 
-
         if ($payment->isPaid() && !$payment->hasRefunds() && !$payment->hasChargebacks()) {
-
             $transaction = "$pluginName payment of $payAmount was accepted. Original Signup Invoice: $invoiceID (OrderID: " . $transactionId . ")";
             $cPlugin->PaymentAccepted($payAmount, $transaction, $transactionId);
         } elseif ($payment->isOpen() || $payment->isPending()) {
-
             $transaction = "$pluginName payment of $payAmount was marked 'pending'. Original Signup Invoice: $invoiceID (OrderID: " . $transactionId . ")";
             $cPlugin->PaymentPending($transaction, $transactionId);
         } elseif ($payment->isFailed() || $payment->isExpired() || $payment->isCanceled() || $payment->hasChargebacks()) {
-
             $transaction = "$pluginName payment of $payAmount was not accepted. Original Signup Invoice: $invoiceID (OrderID: " . $transactionId . ")";
-            $cPlugin->PaymentRejected($payAmount, $transaction, $transactionId);
+            if ($cPlugin->IsUnpaid()) {
+                $cPlugin->PaymentRejected($transaction);
+            } else {
+                $cPlugin->PaymentRejected($transaction, false);
+            }
         } elseif ($payment->hasRefunds()) {
-
             $transaction = "$pluginName payment of $payAmount was refunded. Original Signup Invoice: $invoiceID (OrderID: " . $payment->id . ")";
             $cPlugin->PaymentRefunded($payAmount, $transaction, $transactionId);
         }
