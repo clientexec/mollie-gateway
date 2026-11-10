@@ -7,6 +7,11 @@ class PluginMollieCallback extends PluginCallback
 {
     public function processCallback()
     {
+        // Execute PluginCallback::processCallback() first
+        if (!parent::processCallback()) {
+            return;
+        }
+
         $mollie = new \Mollie\Api\MollieApiClient();
         $mollie->setApiKey($this->settings->get('plugin_mollie_API Key'));
 
@@ -20,16 +25,19 @@ class PluginMollieCallback extends PluginCallback
         $invoiceNO = $payment->metadata->invoice_id;
         $cPlugin = new Plugin($invoiceNO, $pluginName, $this->user);
         $newInvoice = $cPlugin->retrieveInvoiceForTransaction($transactionId);
-        if ($newInvoice) {
-            $invoiceID = $cPlugin->m_ID;
-        }
+        $invoiceID = $newInvoice ? $cPlugin->m_ID : $invoiceNO;
         $cPlugin->setAmount($payAmount);
         $cPlugin->m_TransactionID = $transactionId;
         $cPlugin->m_Action = "charge";
 
-        if ($payment->isPaid() && !$payment->hasRefunds() && !$payment->hasChargebacks()) {
+        if ($payment->hasRefunds()) {
+            $transaction = "$pluginName payment of $payAmount was refunded. Original Signup Invoice: $invoiceID (OrderID: " . $transactionId . ")";
+            $cPlugin->PaymentRefunded($payAmount, $transaction, $transactionId);
+        } elseif ($payment->isPaid() && !$payment->hasChargebacks()) {
             $transaction = "$pluginName payment of $payAmount was accepted. Original Signup Invoice: $invoiceID (OrderID: " . $transactionId . ")";
-            $cPlugin->PaymentAccepted($payAmount, $transaction, $transactionId);
+            if (!$cPlugin->TransExists($transactionId)) {
+                $cPlugin->PaymentAccepted($payAmount, $transaction, $transactionId);
+            }
         } elseif ($payment->isOpen() || $payment->isPending()) {
             $transaction = "$pluginName payment of $payAmount was marked 'pending'. Original Signup Invoice: $invoiceID (OrderID: " . $transactionId . ")";
             $cPlugin->PaymentPending($transaction, $transactionId);
@@ -40,9 +48,6 @@ class PluginMollieCallback extends PluginCallback
             } else {
                 $cPlugin->PaymentRejected($transaction, false);
             }
-        } elseif ($payment->hasRefunds()) {
-            $transaction = "$pluginName payment of $payAmount was refunded. Original Signup Invoice: $invoiceID (OrderID: " . $payment->id . ")";
-            $cPlugin->PaymentRefunded($payAmount, $transaction, $transactionId);
         }
     }
 }

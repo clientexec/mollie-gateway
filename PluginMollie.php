@@ -46,7 +46,7 @@ class PluginMollie extends GatewayPlugin
             $cPlugin->setAction("refund");
             $cPlugin->setLast4("NA");
 
-            $payment->refund([
+            $refund = $payment->refund([
                 "amount" => [
                     "currency" => $params['currencytype'],
                     "value" => sprintf("%01.2f", round($params['invoiceTotal'], 2)),
@@ -54,6 +54,11 @@ class PluginMollie extends GatewayPlugin
             ]);
 
             $transaction = "Mollie payment " . $params['invoiceTotal'] . " was refunded. Original Signup Invoice: " . $params['invoiceNumber'] . " (OrderID: " . $transactionID . ")";
+            if (empty($refund->id) || $cPlugin->TransExists($refund->id)) {
+                CE_Lib::log(4, 'Mollie: refund has no unique ID or was already recorded for payment ' . $transactionID);
+                return;
+            }
+            $cPlugin->setTransactionID($refund->id);
             $cPlugin->PaymentAccepted($params['invoiceTotal'], $transaction, $refund->id);
             return array('AMOUNT' => $params['invoiceTotal']);
         }
